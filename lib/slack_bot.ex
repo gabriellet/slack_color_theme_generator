@@ -9,8 +9,13 @@ defmodule SlackBot do
   use Slack
 
   def start(_type, _args) do
-    Logger.info( fn -> "Starting SlackBot..." end )
-    Slack.Bot.start_link(SlackBot, [], System.get_env("SLACK_API_TOKEN"))
+    if (slack_token()) do
+      Logger.info( fn -> "Starting SlackBot..." end )
+      Slack.Bot.start_link(SlackBot, [], slack_token())
+    else
+      Logger.info( fn -> "No API token.  We won't be starting up the Slack Bot." end )
+      {:ok, nil}
+    end
   end
 
   def handle_connect(slack, state) do
@@ -22,7 +27,7 @@ defmodule SlackBot do
     Logger.info( fn -> "Processing slack uploaded file" end)
     file
     |> Map.get(:url_private)
-    |> SlackClient.fetch_image_from_slack
+    |> ImageFetcher.fetch_from_slack(slack_token())
     |> process_image
     |> send_theme(message.channel, slack)
 
@@ -35,7 +40,7 @@ defmodule SlackBot do
     |> Enum.map( fn %{:image_url => url} -> url end )
     |> Enum.each( fn img ->
       img
-      |> SlackClient.fetch_image
+      |> ImageFetcher.fetch
       |> process_image
       |> send_theme(message.channel, slack)
     end )
@@ -78,6 +83,11 @@ defmodule SlackBot do
   def process_image({ :error, resp }) do
     IO.puts("fail #{resp.status}")
     { :error, resp.status }
+  end
+
+
+  defp slack_token do
+    System.get_env("SLACK_API_TOKEN")
   end
 
 end
